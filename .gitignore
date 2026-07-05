@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# Google credentials
+service_account.json
+
+# Streamlit
+.streamlit/
+.streamlit/secrets.toml
+
+# Local photos
+photos/
+
+# PyCharm
+.idea/
+
+# Build files
+build/
+dist/
+*.spec
+
+# Windows
+Thumbs.db
+Desktop.ini
