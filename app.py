@@ -552,6 +552,27 @@ if "is_submitting" not in st.session_state:
     st.session_state.is_submitting = False
 
 
+def render_disabled_action_button(label):
+    st.markdown(
+        f"""
+        <button disabled style="
+            width: 100%;
+            min-height: 96px;
+            border-radius: 16px;
+            font-size: clamp(1.35rem, 3.2vw, 2rem);
+            font-weight: 800;
+            letter-spacing: 0;
+            color: #8b95a7;
+            background: #e5e7eb;
+            border: 2px solid #cbd5e1;
+            box-shadow: 0 12px 24px rgba(24, 32, 47, 0.08);
+            cursor: not-allowed;
+        ">{label}</button>
+        """,
+        unsafe_allow_html=True
+    )
+
+
 code_input = st.text_input(
     "Κωδικός εργάτη",
     placeholder="π.χ. A001",
@@ -576,9 +597,6 @@ if worker:
         allow_entry = True
         next_action = "ΕΙΣΟΔΟΣ"
 
-if next_action:
-    st.markdown(f"**Επόμενη κίνηση: {next_action}**")
-
 with st.form(key="attendance_form_main", clear_on_submit=True):
     photo = st.camera_input(
         "Φωτογραφία παρουσίας",
@@ -588,20 +606,26 @@ with st.form(key="attendance_form_main", clear_on_submit=True):
     col1, col2 = st.columns(2)
 
     with col1:
-        entry_pressed = st.form_submit_button(
-            "ΕΙΣΟΔΟΣ",
-            type="primary",
-            use_container_width=True,
-            disabled=not allow_entry or st.session_state.is_submitting
-        )
+        if allow_entry:
+            entry_pressed = st.form_submit_button(
+                "ΕΙΣΟΔΟΣ",
+                type="primary",
+                use_container_width=True
+            )
+        else:
+            entry_pressed = False
+            render_disabled_action_button("✓ ΟΛΟΚΛΗΡΩΘΗΚΕ")
 
     with col2:
-        exit_pressed = st.form_submit_button(
-            "ΕΞΟΔΟΣ",
-            type="secondary",
-            use_container_width=True,
-            disabled=not allow_exit or st.session_state.is_submitting
-        )
+        if allow_exit:
+            exit_pressed = st.form_submit_button(
+                "ΕΞΟΔΟΣ",
+                type="secondary",
+                use_container_width=True
+            )
+        else:
+            exit_pressed = False
+            render_disabled_action_button("✓ ΟΛΟΚΛΗΡΩΘΗΚΕ")
 
     if entry_pressed or exit_pressed:
         if st.session_state.is_submitting:
