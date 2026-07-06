@@ -2,6 +2,7 @@ import requests
 import json
 import os
 import hashlib
+import html
 import streamlit as st
 import gspread
 from google.oauth2.service_account import Credentials
@@ -29,6 +30,11 @@ SCOPES = [
     "https://www.googleapis.com/auth/spreadsheets",
     "https://www.googleapis.com/auth/drive"
 ]
+
+SUCCESS_BEEP_WAV_B64 = (
+    "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"
+)
 
 def get_secret(name, default=None):
     if name in os.environ and os.environ[name]:
@@ -395,6 +401,139 @@ def show_message():
         )
 
 
+def queue_fullscreen_feedback(kind, title, lines, beep=False):
+    st.session_state.feedback_counter = st.session_state.get("feedback_counter", 0) + 1
+    st.session_state.fullscreen_feedback = {
+        "id": st.session_state.feedback_counter,
+        "kind": kind,
+        "title": title,
+        "lines": list(lines),
+        "beep": beep,
+    }
+
+
+def render_fullscreen_feedback():
+    feedback = st.session_state.get("fullscreen_feedback")
+    if not feedback:
+        return
+
+    rendered_id = st.session_state.get("fullscreen_feedback_rendered_id")
+    if rendered_id == feedback["id"]:
+        return
+
+    if feedback["kind"] == "success":
+        panel_class = "fs-success"
+        badge = "✓"
+        show_audio = feedback.get("beep", False)
+    else:
+        panel_class = "fs-error"
+        badge = "!"
+        show_audio = False
+
+    lines_html = "".join(
+        f'<div class="fs-line">{html.escape(str(line))}</div>'
+        for line in feedback.get("lines", [])
+        if str(line).strip()
+    )
+
+    audio_html = ""
+    if show_audio:
+        audio_html = (
+            f'<audio autoplay playsinline preload="auto" style="display:none">'
+            f'<source src="data:audio/wav;base64,{SUCCESS_BEEP_WAV_B64}" type="audio/wav">'
+            f"</audio>"
+        )
+
+    st.markdown(
+        f"""
+        <style>
+        .fs-overlay {{
+            position: fixed;
+            inset: 0;
+            z-index: 99999;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(8, 15, 28, 0.72);
+            animation: fsFadeOut 2s ease forwards;
+        }}
+
+        .fs-panel {{
+            width: min(92vw, 980px);
+            min-height: min(82vh, 760px);
+            border-radius: 28px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 2rem;
+            box-shadow: 0 30px 70px rgba(0, 0, 0, 0.35);
+            transform: scale(1);
+            animation: fsPulse 2s ease forwards;
+        }}
+
+        .fs-success {{
+            color: #ecfdf5;
+            background: linear-gradient(135deg, #0f8a44 0%, #156f3a 100%);
+            border: 4px solid rgba(255, 255, 255, 0.18);
+        }}
+
+        .fs-error {{
+            color: #fff7ed;
+            background: linear-gradient(135deg, #c2410c 0%, #b91c1c 100%);
+            border: 4px solid rgba(255, 255, 255, 0.18);
+        }}
+
+        .fs-badge {{
+            font-size: clamp(5rem, 18vw, 10rem);
+            line-height: 1;
+            font-weight: 900;
+            margin-bottom: 0.4rem;
+        }}
+
+        .fs-title {{
+            font-size: clamp(2rem, 6vw, 4.5rem);
+            font-weight: 900;
+            letter-spacing: 0.01em;
+            line-height: 1.05;
+            margin-bottom: 1rem;
+        }}
+
+        .fs-line {{
+            font-size: clamp(1.5rem, 4vw, 2.6rem);
+            font-weight: 800;
+            line-height: 1.2;
+            margin-top: 0.35rem;
+        }}
+
+        @keyframes fsFadeOut {{
+            0% {{ opacity: 1; }}
+            84% {{ opacity: 1; }}
+            100% {{ opacity: 0; visibility: hidden; }}
+        }}
+
+        @keyframes fsPulse {{
+            0% {{ transform: scale(0.98); }}
+            25% {{ transform: scale(1); }}
+            100% {{ transform: scale(1); }}
+        }}
+        </style>
+        <div class="fs-overlay">
+            <div class="fs-panel {panel_class}">
+                <div class="fs-badge">{badge}</div>
+                <div class="fs-title">{html.escape(str(feedback.get("title", "")))}</div>
+                {lines_html}
+            </div>
+        </div>
+        {audio_html}
+        """,
+        unsafe_allow_html=True
+    )
+
+    st.session_state.fullscreen_feedback_rendered_id = feedback["id"]
+
+
 def require_access_code():
     access_code = get_secret("APP_ACCESS_CODE")
 
@@ -436,6 +575,8 @@ st.markdown(
 )
 
 
+
+render_fullscreen_feedback()
 
 def _is_active_worker(worker):
     status_value = None
@@ -568,12 +709,21 @@ def save_attendance(worker, action, photo):
     attendance_sheet.append_row(row)
 
     st.session_state.message = (
-        f"✓ ΚΑΤΑΧΩΡΗΘΗΚΕ<br><br>"
+        f"? ????????????<br><br>"
         f"{action}<br>"
         f"{worker['FirstName']} {worker['LastName']}<br>"
         f"{now.strftime('%H:%M:%S')}"
     )
     st.session_state.message_type = "success"
+    queue_fullscreen_feedback(
+        "success",
+        f"???????? {action}",
+        [
+            f"{worker['FirstName']} {worker['LastName']}",
+            now.strftime("%H:%M:%S"),
+        ],
+        beep=True,
+    )
 
 
 if "is_submitting" not in st.session_state:
@@ -702,31 +852,51 @@ with st.form(key="attendance_form_main", clear_on_submit=True):
 
         try:
             if not worker:
-                st.session_state.message = "ΛΑΘΟΣ Ή ΑΝΕΝΕΡΓΟΣ ΚΩΔΙΚΟΣ"
+                error_message = "????? ? ????????? ???????"
+                st.session_state.message = error_message
                 st.session_state.message_type = "error"
+                queue_fullscreen_feedback("error", "??????", [error_message])
+                should_rerun = True
 
             elif photo is None:
-                st.session_state.message = "ΠΡΕΠΕΙ ΝΑ ΒΓΕΙ ΦΩΤΟΓΡΑΦΙΑ"
+                error_message = "?????? ?? ???? ??????????"
+                st.session_state.message = error_message
                 st.session_state.message_type = "error"
+                queue_fullscreen_feedback("error", "??????", [error_message])
+                should_rerun = True
 
             else:
-                action = "ΕΙΣΟΔΟΣ" if entry_pressed else "ΕΞΟΔΟΣ"
+                action = "???????" if entry_pressed else "??????"
                 last_action = get_last_action_today(worker["Code"])
 
                 if last_action == action:
-                    st.session_state.message = f"Ο ΕΡΓΑΖΟΜΕΝΟΣ ΕΧΕΙ ΗΔΗ ΚΑΝΕΙ {action}"
+                    error_message = f"? ??????????? ???? ??? ????? {action}"
+                    st.session_state.message = error_message
                     st.session_state.message_type = "error"
+                    queue_fullscreen_feedback("error", "??????", [error_message])
+                    should_rerun = True
                 else:
                     last_action = get_last_action_today(worker["Code"])
 
                     if last_action == action:
-                        st.session_state.message = f"Ο ΕΡΓΑΖΟΜΕΝΟΣ ΕΧΕΙ ΗΔΗ ΚΑΝΕΙ {action}"
+                        error_message = f"? ??????????? ???? ??? ????? {action}"
+                        st.session_state.message = error_message
                         st.session_state.message_type = "error"
+                        queue_fullscreen_feedback("error", "??????", [error_message])
+                        should_rerun = True
                     else:
-                        save_attendance(worker, action, photo)
-                        st.session_state.qr_scanned_code = ""
-                        st.session_state.qr_scan_digest = ""
-                        st.session_state.qr_scan_nonce += 1
+                        try:
+                            save_attendance(worker, action, photo)
+                        except Exception:
+                            error_message = "?????? ???? ??? ??????????"
+                            st.session_state.message = error_message
+                            st.session_state.message_type = "error"
+                            queue_fullscreen_feedback("error", "??????", [error_message])
+                            should_rerun = True
+                        else:
+                            st.session_state.qr_scanned_code = ""
+                            st.session_state.qr_scan_digest = ""
+                            st.session_state.qr_scan_nonce += 1
                         should_rerun = True
         finally:
             st.session_state.is_submitting = False
