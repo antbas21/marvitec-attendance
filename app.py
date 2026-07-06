@@ -487,6 +487,10 @@ def save_attendance(worker, action, photo):
     st.session_state.message_type = "success"
 
 
+if "is_submitting" not in st.session_state:
+    st.session_state.is_submitting = False
+
+
 with st.form(key="attendance_form_main", clear_on_submit=True):
     code_input = st.text_input(
         "Κωδικός εργάτη",
@@ -505,7 +509,8 @@ with st.form(key="attendance_form_main", clear_on_submit=True):
         entry_pressed = st.form_submit_button(
             "ΕΙΣΟΔΟΣ",
             type="primary",
-            use_container_width=True
+            use_container_width=True,
+            disabled=st.session_state.is_submitting
         )
 
 
@@ -513,28 +518,43 @@ with st.form(key="attendance_form_main", clear_on_submit=True):
         exit_pressed = st.form_submit_button(
             "ΕΞΟΔΟΣ",
             type="secondary",
-            use_container_width=True
+            use_container_width=True,
+            disabled=st.session_state.is_submitting
         )
 
     if entry_pressed or exit_pressed:
-        worker = find_worker(code_input)
+        if st.session_state.is_submitting:
+            st.stop()
 
-        if not worker:
-            st.session_state.message = "ΛΑΘΟΣ Ή ΑΝΕΝΕΡΓΟΣ ΚΩΔΙΚΟΣ"
-            st.session_state.message_type = "error"
+        st.session_state.is_submitting = True
 
-        elif photo is None:
-            st.session_state.message = "ΠΡΕΠΕΙ ΝΑ ΒΓΕΙ ΦΩΤΟΓΡΑΦΙΑ"
-            st.session_state.message_type = "error"
+        try:
+            worker = find_worker(code_input)
 
-        else:
-            action = "ΕΙΣΟΔΟΣ" if entry_pressed else "ΕΞΟΔΟΣ"
-            last_action = get_last_action_today(worker["Code"])
-
-            if last_action == action:
-                st.session_state.message = f"ÎŸ Î•Î¡Î“Î‘Î–ÎŸÎœÎ•ÎÎŸÎ£ Î•Î§Î•Î™ Î—Î”Î— ÎšÎ‘ÎÎ•Î™ {action}"
+            if not worker:
+                st.session_state.message = "ΛΑΘΟΣ Ή ΑΝΕΝΕΡΓΟΣ ΚΩΔΙΚΟΣ"
                 st.session_state.message_type = "error"
+
+            elif photo is None:
+                st.session_state.message = "ΠΡΕΠΕΙ ΝΑ ΒΓΕΙ ΦΩΤΟΓΡΑΦΙΑ"
+                st.session_state.message_type = "error"
+
             else:
-                save_attendance(worker, action, photo)
+                action = "ΕΙΣΟΔΟΣ" if entry_pressed else "ΕΞΟΔΟΣ"
+                last_action = get_last_action_today(worker["Code"])
+
+                if last_action == action:
+                    st.session_state.message = f"Ο ΕΡΓΑΖΟΜΕΝΟΣ ΕΧΕΙ ΗΔΗ ΚΑΝΕΙ {action}"
+                    st.session_state.message_type = "error"
+                else:
+                    last_action = get_last_action_today(worker["Code"])
+
+                    if last_action == action:
+                        st.session_state.message = f"Ο ΕΡΓΑΖΟΜΕΝΟΣ ΕΧΕΙ ΗΔΗ ΚΑΝΕΙ {action}"
+                        st.session_state.message_type = "error"
+                    else:
+                        save_attendance(worker, action, photo)
+        finally:
+            st.session_state.is_submitting = False
 
 show_message()
