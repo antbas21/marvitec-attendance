@@ -408,6 +408,67 @@ st.markdown(
 )
 
 
+
+def _is_active_worker(worker):
+    status_value = None
+
+    for field in ("Active", "IsActive", "Status", "Enabled"):
+        if field in worker and str(worker.get(field, "")).strip():
+            status_value = normalize_code(worker.get(field))
+            break
+
+    return status_value not in {
+        "0", "FALSE", "NO", "N", "OFF", "INACTIVE", "DISABLED", "ANENERGOS"
+    }
+
+
+def get_today_dashboard():
+    today = datetime.now(ZoneInfo("Europe/Athens"))
+    today_str = today.strftime("%d/%m/%Y")
+    records = attendance_sheet.get_all_records()
+
+    total_active = 0
+    present_count = 0
+    left_count = 0
+
+    for worker in workers:
+        if not _is_active_worker(worker):
+            continue
+
+        total_active += 1
+        normalized_worker_code = normalize_code(worker.get("Code", ""))
+
+        worker_records_today = [
+            record
+            for record in records
+            if str(record.get("Date", "")).strip() == today_str
+            and normalize_code(record.get("Code", "")) == normalized_worker_code
+        ]
+
+        if not worker_records_today:
+            continue
+
+        latest_action = worker_records_today[-1].get("Action", "")
+
+        if latest_action == "ΕΙΣΟΔΟΣ":
+            present_count += 1
+        elif latest_action == "ΕΞΟΔΟΣ":
+            left_count += 1
+
+    absent_count = total_active - present_count - left_count
+
+    return total_active, present_count, left_count, absent_count
+
+
+dashboard_total_active, dashboard_present_count, dashboard_left_count, dashboard_absent_count = get_today_dashboard()
+
+dashboard_col1, dashboard_col2, dashboard_col3, dashboard_col4 = st.columns(4)
+
+dashboard_col1.metric("Ενεργοί", dashboard_total_active)
+dashboard_col2.metric("Παρόντες", dashboard_present_count)
+dashboard_col3.metric("Έφυγαν", dashboard_left_count)
+dashboard_col4.metric("Άποντες", dashboard_absent_count)
+
 def find_worker(code):
     normalized_code = normalize_code(code)
 
