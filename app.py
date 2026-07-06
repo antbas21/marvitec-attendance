@@ -1,3 +1,4 @@
+import requests
 import json
 import os
 import streamlit as st
@@ -315,12 +316,39 @@ def get_sheets_client():
 
 
 def save_photo_local(photo, filename):
-    filepath = PHOTOS_LOCAL_FOLDER / filename
+    supabase_url = get_secret("SUPABASE_URL")
+    supabase_key = get_secret("SUPABASE_SERVICE_KEY")
+    supabase_bucket = get_secret("SUPABASE_BUCKET", "photos")
+
+    safe_filename = filename.replace("ΕΙΣΟΔΟΣ", "IN").replace("ΕΞΟΔΟΣ", "OUT")
+
+    if supabase_url and supabase_key:
+        upload_url = f"{supabase_url}/storage/v1/object/{supabase_bucket}/{safe_filename}"
+
+        headers = {
+            "apikey": supabase_key,
+            "Authorization": f"Bearer {supabase_key}",
+            "Content-Type": "image/jpeg",
+            "x-upsert": "true"
+        }
+
+        response = requests.post(
+            upload_url,
+            headers=headers,
+            data=photo.getvalue()
+        )
+
+        if response.status_code not in [200, 201]:
+            raise Exception(f"Supabase upload failed: {response.text}")
+
+        return f"{supabase_url}/storage/v1/object/public/{supabase_bucket}/{safe_filename}"
+
+    filepath = os.path.join(PHOTOS_LOCAL_FOLDER, safe_filename)
 
     with open(filepath, "wb") as file:
         file.write(photo.getvalue())
 
-    return str(filepath)
+    return filepath
 
 
 def show_message():
