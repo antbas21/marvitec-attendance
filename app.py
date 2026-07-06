@@ -632,6 +632,7 @@ with st.form(key="attendance_form_main", clear_on_submit=True):
             st.stop()
 
         st.session_state.is_submitting = True
+        should_rerun = False
 
         try:
             if not worker:
@@ -657,7 +658,11 @@ with st.form(key="attendance_form_main", clear_on_submit=True):
                         st.session_state.message_type = "error"
                     else:
                         save_attendance(worker, action, photo)
+                        should_rerun = True
         finally:
             st.session_state.is_submitting = False
+
+        if should_rerun:
+            st.rerun()
 
 show_message()
