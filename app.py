@@ -409,16 +409,52 @@ st.markdown(
 
 
 def find_worker(code):
-    clean_code = normalize_code(code)
+    normalized_code = normalize_code(code)
 
     for worker in workers:
-        if (
-            normalize_code(worker["Code"]) == clean_code
-            and str(worker["Active"]).upper().strip() == "YES"
-        ):
-            return worker
+        if normalize_code(worker.get("Code", "")) != normalized_code:
+            continue
+
+        status_value = None
+        for field in ("Active", "IsActive", "Status", "Enabled"):
+            if field in worker and str(worker.get(field, "")).strip():
+                status_value = normalize_code(worker.get(field))
+                break
+
+        if status_value in {"0", "FALSE", "NO", "N", "OFF", "INACTIVE", "DISABLED", "ANENERGOS"}:
+            continue
+
+        return worker
 
     return None
+
+
+def get_last_action_today(worker_code):
+    today = datetime.now(ZoneInfo("Europe/Athens"))
+    today_str = today.strftime("%d/%m/%Y")
+    today_date = today.date()
+    records = attendance_sheet.get_all_records()
+
+    worker_records_today = []
+
+    for record in records:
+        record_date = record.get("Date", "")
+
+        if isinstance(record_date, datetime):
+            is_today = record_date.date() == today_date
+        else:
+            is_today = str(record_date).strip() == today_str
+
+        if not is_today:
+            continue
+
+        if normalize_code(record.get("Code", "")) == normalize_code(worker_code):
+            worker_records_today.append(record)
+
+    if not worker_records_today:
+        return None
+
+    return worker_records_today[-1].get("Action", "")
 
 
 def save_attendance(worker, action, photo):
@@ -493,6 +529,12 @@ with st.form(key="attendance_form_main", clear_on_submit=True):
 
         else:
             action = "ΕΙΣΟΔΟΣ" if entry_pressed else "ΕΞΟΔΟΣ"
-            save_attendance(worker, action, photo)
+            last_action = get_last_action_today(worker["Code"])
+
+            if last_action == action:
+                st.session_state.message = f"ÎŸ Î•Î¡Î“Î‘Î–ÎŸÎœÎ•ÎÎŸÎ£ Î•Î§Î•Î™ Î—Î”Î— ÎšÎ‘ÎÎ•Î™ {action}"
+                st.session_state.message_type = "error"
+            else:
+                save_attendance(worker, action, photo)
 
 show_message()
