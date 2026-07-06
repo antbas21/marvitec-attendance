@@ -552,13 +552,34 @@ if "is_submitting" not in st.session_state:
     st.session_state.is_submitting = False
 
 
-with st.form(key="attendance_form_main", clear_on_submit=True):
-    code_input = st.text_input(
-        "Κωδικός εργάτη",
-        placeholder="π.χ. A001",
-        key="code_input_main"
-    )
+code_input = st.text_input(
+    "Κωδικός εργάτη",
+    placeholder="π.χ. A001",
+    key="code_input_main"
+)
 
+worker = find_worker(code_input)
+last_action = get_last_action_today(worker["Code"]) if worker else None
+
+allow_entry = False
+allow_exit = False
+next_action = None
+
+if worker:
+    if last_action is None:
+        allow_entry = True
+        next_action = "ΕΙΣΟΔΟΣ"
+    elif last_action == "ΕΙΣΟΔΟΣ":
+        allow_exit = True
+        next_action = "ΕΞΟΔΟΣ"
+    elif last_action == "ΕΞΟΔΟΣ":
+        allow_entry = True
+        next_action = "ΕΙΣΟΔΟΣ"
+
+if next_action:
+    st.markdown(f"**Επόμενη κίνηση: {next_action}**")
+
+with st.form(key="attendance_form_main", clear_on_submit=True):
     photo = st.camera_input(
         "Φωτογραφία παρουσίας",
         key="photo_input_main"
@@ -571,16 +592,15 @@ with st.form(key="attendance_form_main", clear_on_submit=True):
             "ΕΙΣΟΔΟΣ",
             type="primary",
             use_container_width=True,
-            disabled=st.session_state.is_submitting
+            disabled=not allow_entry or st.session_state.is_submitting
         )
-
 
     with col2:
         exit_pressed = st.form_submit_button(
             "ΕΞΟΔΟΣ",
             type="secondary",
             use_container_width=True,
-            disabled=st.session_state.is_submitting
+            disabled=not allow_exit or st.session_state.is_submitting
         )
 
     if entry_pressed or exit_pressed:
@@ -590,8 +610,6 @@ with st.form(key="attendance_form_main", clear_on_submit=True):
         st.session_state.is_submitting = True
 
         try:
-            worker = find_worker(code_input)
-
             if not worker:
                 st.session_state.message = "ΛΑΘΟΣ Ή ΑΝΕΝΕΡΓΟΣ ΚΩΔΙΚΟΣ"
                 st.session_state.message_type = "error"
