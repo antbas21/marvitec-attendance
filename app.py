@@ -1,12 +1,22 @@
 import requests
 import json
 import os
+import hashlib
 import streamlit as st
 import gspread
 from google.oauth2.service_account import Credentials
 from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
+
+try:
+    import cv2
+    import numpy as np
+    QR_SCANNER_AVAILABLE = True
+except Exception:
+    cv2 = None
+    np = None
+    QR_SCANNER_AVAILABLE = False
 
 WORKERS_SHEET_ID = "1eFCmli9zQw-BjU2KbvLccI8e6C7-d00nzPKR5IskutQ"
 ATTENDANCE_SHEET_ID = "1EJfGVlYZsv2Ue70aVwAYv20ijgm9FEq9tIhwIUwd2uc"
@@ -296,6 +306,24 @@ def normalize_code(text):
     return text
 
 
+def decode_qr_worker_code(image_file):
+    if not QR_SCANNER_AVAILABLE or image_file is None:
+        return None
+
+    image_bytes = image_file.getvalue()
+    image_array = np.frombuffer(image_bytes, dtype=np.uint8)
+    image = cv2.imdecode(image_array, cv2.IMREAD_COLOR)
+
+    if image is None:
+        return None
+
+    detector = cv2.QRCodeDetector()
+    decoded_text, _, _ = detector.detectAndDecode(image)
+    decoded_text = normalize_code(decoded_text)
+
+    return decoded_text if decoded_text else None
+
+
 @st.cache_resource
 def get_sheets_client():
     service_account_json = get_secret("GOOGLE_SERVICE_ACCOUNT_JSON")
@@ -551,6 +579,15 @@ def save_attendance(worker, action, photo):
 if "is_submitting" not in st.session_state:
     st.session_state.is_submitting = False
 
+if "qr_scan_nonce" not in st.session_state:
+    st.session_state.qr_scan_nonce = 0
+
+if "qr_scanned_code" not in st.session_state:
+    st.session_state.qr_scanned_code = ""
+
+if "qr_scan_digest" not in st.session_state:
+    st.session_state.qr_scan_digest = ""
+
 
 def render_disabled_action_button(label):
     st.markdown(
@@ -579,7 +616,36 @@ code_input = st.text_input(
     key="code_input_main"
 )
 
-worker = find_worker(code_input)
+st.markdown("**QR scan (optional)**")
+qr_scan_image = st.camera_input(
+    "Scan a QR code containing the worker code",
+    key=f"qr_scan_input_{st.session_state.qr_scan_nonce}"
+)
+
+if qr_scan_image is not None:
+    qr_scan_digest = hashlib.sha1(qr_scan_image.getvalue()).hexdigest()
+
+    if qr_scan_digest != st.session_state.qr_scan_digest:
+        st.session_state.qr_scan_digest = qr_scan_digest
+        scanned_qr_code = decode_qr_worker_code(qr_scan_image)
+
+        if scanned_qr_code:
+            st.session_state.qr_scanned_code = scanned_qr_code
+        else:
+            st.session_state.qr_scanned_code = ""
+
+if st.session_state.qr_scanned_code:
+    st.success(f"QR code ready: {st.session_state.qr_scanned_code}")
+    if st.button("Clear QR scan", key="clear_qr_scan"):
+        st.session_state.qr_scanned_code = ""
+        st.session_state.qr_scan_digest = ""
+        st.session_state.qr_scan_nonce += 1
+        st.rerun()
+elif not QR_SCANNER_AVAILABLE:
+    st.info("QR scanning is unavailable because OpenCV is not installed.")
+
+effective_code = st.session_state.qr_scanned_code or code_input
+worker = find_worker(effective_code)
 last_action = get_last_action_today(worker["Code"]) if worker else None
 
 allow_entry = False
@@ -658,6 +724,9 @@ with st.form(key="attendance_form_main", clear_on_submit=True):
                         st.session_state.message_type = "error"
                     else:
                         save_attendance(worker, action, photo)
+                        st.session_state.qr_scanned_code = ""
+                        st.session_state.qr_scan_digest = ""
+                        st.session_state.qr_scan_nonce += 1
                         should_rerun = True
         finally:
             st.session_state.is_submitting = False
