@@ -856,6 +856,7 @@ with st.form(key="attendance_form_main", clear_on_submit=True):
                 st.session_state.message = error_message
                 st.session_state.message_type = "error"
                 queue_fullscreen_feedback("error", "??????", [error_message])
+                st.session_state.is_submitting = False
                 should_rerun = True
 
             elif photo is None:
@@ -863,6 +864,7 @@ with st.form(key="attendance_form_main", clear_on_submit=True):
                 st.session_state.message = error_message
                 st.session_state.message_type = "error"
                 queue_fullscreen_feedback("error", "??????", [error_message])
+                st.session_state.is_submitting = False
                 should_rerun = True
 
             else:
@@ -874,6 +876,7 @@ with st.form(key="attendance_form_main", clear_on_submit=True):
                     st.session_state.message = error_message
                     st.session_state.message_type = "error"
                     queue_fullscreen_feedback("error", "??????", [error_message])
+                    st.session_state.is_submitting = False
                     should_rerun = True
                 else:
                     last_action = get_last_action_today(worker["Code"])
@@ -883,6 +886,7 @@ with st.form(key="attendance_form_main", clear_on_submit=True):
                         st.session_state.message = error_message
                         st.session_state.message_type = "error"
                         queue_fullscreen_feedback("error", "??????", [error_message])
+                        st.session_state.is_submitting = False
                         should_rerun = True
                     else:
                         try:
@@ -892,16 +896,19 @@ with st.form(key="attendance_form_main", clear_on_submit=True):
                             st.session_state.message = error_message
                             st.session_state.message_type = "error"
                             queue_fullscreen_feedback("error", "??????", [error_message])
+                            st.session_state.is_submitting = False
                             should_rerun = True
                         else:
                             st.session_state.qr_scanned_code = ""
                             st.session_state.qr_scan_digest = ""
                             st.session_state.qr_scan_nonce += 1
-                        should_rerun = True
+                            st.session_state.is_submitting = False
+                            should_rerun = True
         finally:
             st.session_state.is_submitting = False
 
         if should_rerun:
+            st.session_state.is_submitting = False
             st.rerun()
 
 show_message()
